@@ -130,9 +130,9 @@ export const RecordTransactionScreen = ({ navigation, route }: any) => {
 
         {/* Amount */}
         <View style={styles.section}>
-          <Text style={styles.label}>Amount (GHS)</Text>
+          <Text style={styles.label}>Amount</Text>
           <View style={styles.amountWrap}>
-            <Text style={styles.ghsLabel}>GHS</Text>
+            <Text style={styles.ghsLabel}>₵</Text>
             <TextInput
               style={styles.amountInput}
               placeholder="0.00"

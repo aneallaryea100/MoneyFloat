@@ -16,6 +16,9 @@ import { StatCard } from '../../components/StatCard';
 import { TransactionItem } from '../../components/TransactionItem';
 import { DailySummary, Transaction } from '../../types';
 import { OpenSessionModal } from './OpenSessionModal';
+import { TopUpModal } from './TopUpModal';
+import { recordReplenishment } from '../../db/database';
+import { ReplenishmentType } from '../../types';
 
 export const AgentDashboard = ({ navigation }: any) => {
   const { user, logout } = useAuth();
@@ -23,6 +26,7 @@ export const AgentDashboard = ({ navigation }: any) => {
   const [summary, setSummary] = useState<DailySummary | null>(null);
   const [recentTxns, setRecentTxns] = useState<Transaction[]>([]);
   const [showOpenModal, setShowOpenModal] = useState(false);
+  const [showTopUpModal, setShowTopUpModal] = useState(false);
   const [refreshing, setRefreshing] = useState(false);
 
   const loadData = useCallback(() => {
@@ -46,6 +50,17 @@ export const AgentDashboard = ({ navigation }: any) => {
     setRefreshing(true);
     loadData();
     setRefreshing(false);
+  };
+
+  const handleTopUp = (type: ReplenishmentType, amount: number, note?: string) => {
+    if (!activeSession || !user) return;
+    recordReplenishment(user.id, activeSession.id, type, amount, note);
+    setShowTopUpModal(false);
+    loadData();
+    Alert.alert(
+      'Top Up Recorded',
+      `${formatCurrency(amount)} added to your ${type === 'cash' ? 'cash' : 'e-money float'}.`
+    );
   };
 
   const handleOpenSession = (openingFloat: number, openingCash: number) => {
@@ -142,27 +157,34 @@ export const AgentDashboard = ({ navigation }: any) => {
               </View>
             </View>
 
-            {/* Action Buttons */}
-            <View style={styles.actionRow}>
+            {/* Action Buttons — 2x2 grid */}
+            <View style={styles.actionFlex}>
               <TouchableOpacity
                 style={[styles.actionBtn, { backgroundColor: COLORS.success }]}
                 onPress={() => navigation.navigate('RecordTransaction', { type: 'deposit' })}
               >
-                <Ionicons name="arrow-down-circle" size={28} color="white" />
+                <Ionicons name="arrow-down-circle" size={26} color="white" />
                 <Text style={styles.actionBtnText}>Deposit</Text>
               </TouchableOpacity>
               <TouchableOpacity
                 style={[styles.actionBtn, { backgroundColor: COLORS.danger }]}
                 onPress={() => navigation.navigate('RecordTransaction', { type: 'withdrawal' })}
               >
-                <Ionicons name="arrow-up-circle" size={28} color="white" />
+                <Ionicons name="arrow-up-circle" size={26} color="white" />
                 <Text style={styles.actionBtnText}>Withdrawal</Text>
+              </TouchableOpacity>
+              <TouchableOpacity
+                style={[styles.actionBtn, { backgroundColor: COLORS.warning }]}
+                onPress={() => setShowTopUpModal(true)}
+              >
+                <Ionicons name="add-circle" size={26} color="white" />
+                <Text style={styles.actionBtnText}>Top Up</Text>
               </TouchableOpacity>
               <TouchableOpacity
                 style={[styles.actionBtn, { backgroundColor: COLORS.secondary }]}
                 onPress={() => navigation.navigate('EndOfDay')}
               >
-                <Ionicons name="calculator" size={28} color="white" />
+                <Ionicons name="calculator" size={26} color="white" />
                 <Text style={styles.actionBtnText}>Reconcile</Text>
               </TouchableOpacity>
             </View>
@@ -187,6 +209,12 @@ export const AgentDashboard = ({ navigation }: any) => {
         visible={showOpenModal}
         onClose={() => setShowOpenModal(false)}
         onOpen={handleOpenSession}
+      />
+
+      <TopUpModal
+        visible={showTopUpModal}
+        onClose={() => setShowTopUpModal(false)}
+        onTopUp={handleTopUp}
       />
     </View>
   );
@@ -237,12 +265,17 @@ const styles = StyleSheet.create({
   commissionText: { flex: 1 },
   commissionLabel: { color: COLORS.textLight, fontSize: 12, opacity: 0.7 },
   commissionValue: { color: COLORS.primary, fontSize: 20, fontWeight: '800', marginTop: 2 },
-  actionRow: { flexDirection: 'row', gap: 10, marginBottom: 24 },
-  actionBtn: {
-    flex: 1, borderRadius: 14, padding: 16,
-    alignItems: 'center', gap: 6,
+  actionGrid: {
+    flexDirection: 'row', flexWrap: 'wrap', gap: 10, marginBottom: 24,
   },
-  actionBtnText: { color: 'white', fontSize: 12, fontWeight: '700' },
+  actionFlex: {
+      flexDirection: 'row', flexWrap: 'wrap', gap: 10, marginBottom: 24, justifyContent: 'space-between'
+  },
+  actionBtn: {
+    width: '47.5%', borderRadius: 14, paddingVertical: 18, paddingHorizontal: 12,
+    alignItems: 'center', gap: 8,
+  },
+  actionBtnText: { color: 'white', fontSize: 13, fontWeight: '700', textAlign: 'center' },
   section: { marginTop: 4 },
   sectionHeader: {
     flexDirection: 'row', justifyContent: 'space-between',

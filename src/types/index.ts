@@ -4,6 +4,18 @@ export type MomoNetwork = 'MTN' | 'Telecel' | 'AirtelTigo';
 
 export type TransactionType = 'deposit' | 'withdrawal';
 
+export type ReplenishmentType = 'cash' | 'float';
+
+export interface Replenishment {
+  id: string;
+  agentId: string;
+  sessionId: string;
+  type: ReplenishmentType;
+  amount: number;
+  note?: string;
+  createdAt: string;
+}
+
 export type SessionStatus = 'open' | 'closed';
 
 export interface User {
@@ -59,6 +71,8 @@ export interface Reconciliation {
   totalDeposits: number;
   totalWithdrawals: number;
   totalCommission: number;
+  totalCashReplenishments: number;
+  totalFloatReplenishments: number;
   expectedCash: number;
   actualCash: number;
   expectedFloat: number;
@@ -75,6 +89,8 @@ export interface DailySummary {
   depositCount: number;
   withdrawalCount: number;
   totalCommission: number;
+  totalCashReplenishments: number;
+  totalFloatReplenishments: number;
   expectedCash: number;
   expectedFloat: number;
 }

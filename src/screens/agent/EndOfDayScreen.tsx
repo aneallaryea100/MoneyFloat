@@ -8,10 +8,13 @@ import { useAuth } from '../../context/AuthContext';
 import { useSession } from '../../context/SessionContext';
 import {
   computeDailySummary, saveReconciliation,
-  getTransactionsBySession
+  getTransactionsBySession, getReconciliationBySession,
+  getBusinessById, getUserById
 } from '../../db/database';
 import { COLORS, formatCurrency, formatDate } from '../../constants';
-import { DailySummary, Transaction } from '../../types';
+import { DailySummary, Transaction, Reconciliation } from '../../types';
+import { generateDailyReconciliationHTML } from '../../utils/pdfTemplates';
+import { promptExportAction } from '../../utils/pdfExport';
 
 export const EndOfDayScreen = ({ navigation }: any) => {
   const { user } = useAuth();
@@ -21,6 +24,7 @@ export const EndOfDayScreen = ({ navigation }: any) => {
   const [actualCash, setActualCash] = useState('');
   const [actualFloat, setActualFloat] = useState('');
   const [showResult, setShowResult] = useState(false);
+  const [savedRecon, setSavedRecon] = useState<Reconciliation | null>(null);
 
   useEffect(() => {
     if (activeSession) {
@@ -73,12 +77,23 @@ export const EndOfDayScreen = ({ navigation }: any) => {
         text: 'Close Session',
         style: totalVariance > 50 ? 'destructive' : 'default',
         onPress: () => {
-          saveReconciliation(activeSession.id, user!.id, parsedCash, parsedFloat);
+          const recon = saveReconciliation(activeSession.id, user!.id, parsedCash, parsedFloat);
+          setSavedRecon(recon);
           setActiveSession(null);
           setShowResult(true);
         }
       }
     ]);
+  };
+
+  const handleExportPDF = () => {
+    if (!savedRecon || !user) return;
+    const business = getBusinessById(user.businessId);
+    const sessionSnap = { openingFloat: summary!.session.openingFloat, openingCash: summary!.session.openingCash };
+    if (!business) return;
+    const html = generateDailyReconciliationHTML(savedRecon, user, business, sessionSnap);
+    const filename = `MoneyFloat_Reconciliation_${savedRecon.date}_${user.name.replace(/\s+/g, '_')}`;
+    promptExportAction(html, filename);
   };
 
   if (showResult) {
@@ -105,6 +120,12 @@ export const EndOfDayScreen = ({ navigation }: any) => {
             <ResultRow label="Opening Cash" value={formatCurrency(activeSession.openingCash)} />
             <ResultRow label="Total Deposits" value={formatCurrency(summary.totalDeposits)} valueColor={COLORS.success} sub={`${summary.depositCount} transactions`} />
             <ResultRow label="Total Withdrawals" value={formatCurrency(summary.totalWithdrawals)} valueColor={COLORS.danger} sub={`${summary.withdrawalCount} transactions`} />
+            {summary.totalCashReplenishments > 0 && (
+              <ResultRow label="Cash Top Ups" value={`+${formatCurrency(summary.totalCashReplenishments)}`} valueColor={COLORS.success} />
+            )}
+            {summary.totalFloatReplenishments > 0 && (
+              <ResultRow label="Float Top Ups" value={`+${formatCurrency(summary.totalFloatReplenishments)}`} valueColor={COLORS.info} />
+            )}
             <ResultRow label="Commission Earned" value={formatCurrency(summary.totalCommission)} valueColor={COLORS.primary} />
           </View>
 
@@ -145,9 +166,15 @@ export const EndOfDayScreen = ({ navigation }: any) => {
           </View>
         </ScrollView>
 
-        <TouchableOpacity style={styles.doneBtn} onPress={() => navigation.navigate('AgentDashboard')}>
-          <Text style={styles.doneBtnText}>Done</Text>
-        </TouchableOpacity>
+        <View style={styles.bottomBtns}>
+          <TouchableOpacity style={styles.pdfBtn} onPress={handleExportPDF}>
+            <Ionicons name="document-text-outline" size={20} color={COLORS.secondary} />
+            <Text style={styles.pdfBtnText}>Download PDF</Text>
+          </TouchableOpacity>
+          <TouchableOpacity style={styles.doneBtn} onPress={() => navigation.navigate('AgentDashboard')}>
+            <Text style={styles.doneBtnText}>Done</Text>
+          </TouchableOpacity>
+        </View>
       </View>
     );
   }
@@ -188,6 +215,27 @@ export const EndOfDayScreen = ({ navigation }: any) => {
               <Text style={styles.summaryItemSub}>{txns.length} total</Text>
             </View>
           </View>
+
+          {(summary.totalCashReplenishments > 0 || summary.totalFloatReplenishments > 0) && (
+            <View style={styles.replenishmentRow}>
+              {summary.totalCashReplenishments > 0 && (
+                <View style={styles.replenishmentItem}>
+                  <Ionicons name="cash-outline" size={14} color={COLORS.success} />
+                  <Text style={styles.replenishmentText}>
+                    Cash Top Up: +{formatCurrency(summary.totalCashReplenishments)}
+                  </Text>
+                </View>
+              )}
+              {summary.totalFloatReplenishments > 0 && (
+                <View style={styles.replenishmentItem}>
+                  <Ionicons name="phone-portrait-outline" size={14} color={COLORS.info} />
+                  <Text style={[styles.replenishmentText, { color: COLORS.info }]}>
+                    Float Top Up: +{formatCurrency(summary.totalFloatReplenishments)}
+                  </Text>
+                </View>
+              )}
+            </View>
+          )}
         </View>
 
         {/* Expected Values */}
@@ -212,9 +260,9 @@ export const EndOfDayScreen = ({ navigation }: any) => {
           <Text style={styles.cardTitle}>Count Your Physical Balances</Text>
 
           <View style={styles.inputGroup}>
-            <Text style={styles.inputLabel}>Actual Cash in Hand (GHS)</Text>
+            <Text style={styles.inputLabel}>Actual Cash in Hand</Text>
             <View style={styles.inputWrap}>
-              <Text style={styles.ghsLabel}>GHS</Text>
+              <Text style={styles.ghsLabel}>₵</Text>
               <TextInput
                 style={styles.input}
                 placeholder="0.00"
@@ -232,9 +280,9 @@ export const EndOfDayScreen = ({ navigation }: any) => {
           </View>
 
           <View style={styles.inputGroup}>
-            <Text style={styles.inputLabel}>Actual Float Balance (GHS)</Text>
+            <Text style={styles.inputLabel}>Actual Float Balance</Text>
             <View style={styles.inputWrap}>
-              <Text style={styles.ghsLabel}>GHS</Text>
+              <Text style={styles.ghsLabel}>₵</Text>
               <TextInput
                 style={styles.input}
                 placeholder="0.00"
@@ -314,6 +362,12 @@ const styles = StyleSheet.create({
   summaryItemValue: { fontSize: 16, fontWeight: '800' },
   summaryItemSub: { fontSize: 10, color: COLORS.textSecondary, marginTop: 2 },
   expectedCard: { backgroundColor: COLORS.surface, borderRadius: 16, padding: 16, marginBottom: 12 },
+  replenishmentRow: {
+    marginTop: 10, borderTopWidth: 1, borderTopColor: COLORS.background,
+    paddingTop: 10, gap: 6,
+  },
+  replenishmentItem: { flexDirection: 'row', alignItems: 'center', gap: 6 },
+  replenishmentText: { fontSize: 12, fontWeight: '600', color: COLORS.success },
   expectedRow: { flexDirection: 'row', gap: 12 },
   expectedItem: {
     flex: 1, alignItems: 'center', backgroundColor: COLORS.background,
@@ -348,8 +402,15 @@ const styles = StyleSheet.create({
   resultCard: {
     backgroundColor: COLORS.surface, borderRadius: 14, padding: 16, marginBottom: 12,
   },
+  bottomBtns: { padding: 16, gap: 10 },
+  pdfBtn: {
+    borderWidth: 2, borderColor: COLORS.primary, borderRadius: 14, height: 50,
+    flexDirection: 'row', justifyContent: 'center', alignItems: 'center', gap: 8,
+    backgroundColor: COLORS.primary + '18',
+  },
+  pdfBtnText: { fontSize: 15, fontWeight: '700', color: COLORS.secondary },
   doneBtn: {
-    margin: 16, backgroundColor: COLORS.primary, borderRadius: 14, height: 56,
+    backgroundColor: COLORS.primary, borderRadius: 14, height: 56,
     justifyContent: 'center', alignItems: 'center',
   },
   doneBtnText: { fontSize: 17, fontWeight: '700', color: COLORS.secondary },

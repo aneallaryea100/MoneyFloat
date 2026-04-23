@@ -5,17 +5,39 @@ import {
 import { useFocusEffect } from '@react-navigation/native';
 import { Ionicons } from '@expo/vector-icons';
 import { useAuth } from '../../context/AuthContext';
-import { getReconciliationsByBusiness, getUserById } from '../../db/database';
+import {
+  getReconciliationsByBusiness, getUserById,
+  getAgentsByBusiness, getBusinessById
+} from '../../db/database';
 import { COLORS, formatCurrency, formatDate } from '../../constants';
-import { Reconciliation } from '../../types';
+import { Reconciliation, User } from '../../types';
+import { generateBusinessStatementHTML } from '../../utils/pdfTemplates';
+import { promptExportAction } from '../../utils/pdfExport';
 
 export const AllReconciliationsScreen = ({ navigation }: any) => {
   const { user } = useAuth();
   const [recons, setRecons] = useState<Reconciliation[]>([]);
+  const [agentMap, setAgentMap] = useState<Record<string, User>>({});
 
   useFocusEffect(useCallback(() => {
-    if (user) setRecons(getReconciliationsByBusiness(user.businessId));
+    if (!user) return;
+    const data = getReconciliationsByBusiness(user.businessId);
+    setRecons(data);
+    const agents = getAgentsByBusiness(user.businessId);
+    const map: Record<string, User> = {};
+    agents.forEach(a => { map[a.id] = a; });
+    if (user.role === 'admin') map[user.id] = user;
+    setAgentMap(map);
   }, [user]));
+
+  const handleExportPDF = () => {
+    if (!user) return;
+    const business = getBusinessById(user.businessId);
+    if (!business) return;
+    const html = generateBusinessStatementHTML(recons, agentMap, business, 'All Time');
+    const filename = `MoneyFloat_BusinessStatement_${business.name.replace(/\s+/g, '_')}`;
+    promptExportAction(html, filename);
+  };
 
   return (
     <View style={styles.container}>
@@ -24,7 +46,10 @@ export const AllReconciliationsScreen = ({ navigation }: any) => {
           <Ionicons name="arrow-back" size={24} color={COLORS.textLight} />
         </TouchableOpacity>
         <Text style={styles.headerTitle}>All Reconciliations</Text>
-        <View style={{ width: 24 }} />
+        <TouchableOpacity onPress={handleExportPDF} style={styles.exportBtn}>
+          <Ionicons name="document-text-outline" size={20} color={COLORS.primary} />
+          <Text style={styles.exportBtnText}>PDF</Text>
+        </TouchableOpacity>
       </View>
 
       <FlatList
@@ -38,7 +63,7 @@ export const AllReconciliationsScreen = ({ navigation }: any) => {
           </View>
         )}
         renderItem={({ item: r }) => {
-          const agent = getUserById(r.agentId);
+          const agent = agentMap[r.agentId];
           const cashOk = Math.abs(r.cashVariance) < 1;
           const floatOk = Math.abs(r.floatVariance) < 1;
           const balanced = cashOk && floatOk;
@@ -103,6 +128,11 @@ const styles = StyleSheet.create({
     flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between',
   },
   headerTitle: { fontSize: 18, fontWeight: '700', color: COLORS.textLight },
+  exportBtn: {
+    flexDirection: 'row', alignItems: 'center', gap: 4,
+    backgroundColor: COLORS.primary + '22', borderRadius: 8, paddingHorizontal: 10, paddingVertical: 6,
+  },
+  exportBtnText: { color: COLORS.primary, fontWeight: '700', fontSize: 13 },
   list: { padding: 16 },
   empty: { alignItems: 'center', paddingTop: 60 },
   emptyText: { color: COLORS.textSecondary, marginTop: 10, fontSize: 15 },

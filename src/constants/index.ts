@@ -51,7 +51,8 @@ export const COMMISSION_RATES: Record<MomoNetwork, { min: number; max: number; r
 export const NETWORKS: MomoNetwork[] = ['MTN', 'Telecel', 'AirtelTigo'];
 
 export const formatCurrency = (amount: number): string => {
-  return `GHS ${amount.toFixed(2)}`;
+  const formatted = amount.toFixed(2).replace(/\B(?=(\d{3})+(?!\d))/g, ',');
+  return `₵${formatted}`;
 };
 
 export const formatDate = (dateStr: string): string => {

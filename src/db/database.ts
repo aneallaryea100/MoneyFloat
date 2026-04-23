@@ -1,6 +1,6 @@
 import * as SQLite from 'expo-sqlite';
 import {
-  User, Business, Transaction, DailySession, Reconciliation, DailySummary
+  User, Business, Transaction, DailySession, Reconciliation, DailySummary, Replenishment
 } from '../types';
 import { generateId, generateReference, calculateCommission } from '../utils/commission';
 import { TODAY } from '../constants';
@@ -70,6 +70,18 @@ export const initDatabase = async (): Promise<void> => {
       FOREIGN KEY (sessionId) REFERENCES daily_sessions(id)
     );
 
+    CREATE TABLE IF NOT EXISTS replenishments (
+      id TEXT PRIMARY KEY,
+      agentId TEXT NOT NULL,
+      sessionId TEXT NOT NULL,
+      type TEXT NOT NULL CHECK(type IN ('cash','float')),
+      amount REAL NOT NULL,
+      note TEXT,
+      createdAt TEXT NOT NULL,
+      FOREIGN KEY (agentId) REFERENCES users(id),
+      FOREIGN KEY (sessionId) REFERENCES daily_sessions(id)
+    );
+
     CREATE TABLE IF NOT EXISTS reconciliations (
       id TEXT PRIMARY KEY,
       sessionId TEXT NOT NULL UNIQUE,
@@ -78,6 +90,8 @@ export const initDatabase = async (): Promise<void> => {
       totalDeposits REAL NOT NULL DEFAULT 0,
       totalWithdrawals REAL NOT NULL DEFAULT 0,
       totalCommission REAL NOT NULL DEFAULT 0,
+      totalCashReplenishments REAL NOT NULL DEFAULT 0,
+      totalFloatReplenishments REAL NOT NULL DEFAULT 0,
       expectedCash REAL NOT NULL DEFAULT 0,
       actualCash REAL NOT NULL DEFAULT 0,
       expectedFloat REAL NOT NULL DEFAULT 0,
@@ -88,6 +102,19 @@ export const initDatabase = async (): Promise<void> => {
       FOREIGN KEY (sessionId) REFERENCES daily_sessions(id)
     );
   `);
+
+  // Migration: add replenishment columns to reconciliations if they don't exist yet.
+  // PRAGMA table_info returns one row per column — we check by name before altering.
+  type ColInfo = { name: string };
+  const cols = database.getAllSync<ColInfo>('PRAGMA table_info(reconciliations)');
+  const colNames = cols.map(c => c.name);
+
+  if (!colNames.includes('totalCashReplenishments')) {
+    database.runSync('ALTER TABLE reconciliations ADD COLUMN totalCashReplenishments REAL DEFAULT 0');
+  }
+  if (!colNames.includes('totalFloatReplenishments')) {
+    database.runSync('ALTER TABLE reconciliations ADD COLUMN totalFloatReplenishments REAL DEFAULT 0');
+  }
 };
 
 // ─── Business ───────────────────────────────────────────────────────────────
@@ -258,12 +285,47 @@ export const getTransactionsByAgent = (agentId: string, limit = 50): Transaction
   );
 };
 
+// ─── Replenishments ───────────────────────────────────────────────────────────
+
+export const recordReplenishment = (
+  agentId: string,
+  sessionId: string,
+  type: 'cash' | 'float',
+  amount: number,
+  note?: string
+): Replenishment => {
+  const database = getDb();
+  const replenishment: Replenishment = {
+    id: generateId(),
+    agentId,
+    sessionId,
+    type,
+    amount,
+    note,
+    createdAt: new Date().toISOString(),
+  };
+  database.runSync(
+    'INSERT INTO replenishments (id, agentId, sessionId, type, amount, note, createdAt) VALUES (?, ?, ?, ?, ?, ?, ?)',
+    [replenishment.id, replenishment.agentId, replenishment.sessionId, replenishment.type,
+     replenishment.amount, replenishment.note ?? null, replenishment.createdAt]
+  );
+  return replenishment;
+};
+
+export const getReplenishmentsBySession = (sessionId: string): Replenishment[] => {
+  const database = getDb();
+  return database.getAllSync<Replenishment>(
+    'SELECT * FROM replenishments WHERE sessionId = ? ORDER BY createdAt DESC',
+    [sessionId]
+  );
+};
+
 // ─── Reconciliation ───────────────────────────────────────────────────────────
 
 export const computeDailySummary = (sessionId: string): DailySummary => {
-  const database = getDb();
   const session = getSessionById(sessionId)!;
   const txns = getTransactionsBySession(sessionId);
+  const replenishments = getReplenishmentsBySession(sessionId);
 
   const deposits = txns.filter(t => t.type === 'deposit');
   const withdrawals = txns.filter(t => t.type === 'withdrawal');
@@ -271,11 +333,13 @@ export const computeDailySummary = (sessionId: string): DailySummary => {
   const totalDeposits = deposits.reduce((s, t) => s + t.amount, 0);
   const totalWithdrawals = withdrawals.reduce((s, t) => s + t.amount, 0);
   const totalCommission = txns.reduce((s, t) => s + t.commission, 0);
+  const totalCashReplenishments = replenishments.filter(r => r.type === 'cash').reduce((s, r) => s + r.amount, 0);
+  const totalFloatReplenishments = replenishments.filter(r => r.type === 'float').reduce((s, r) => s + r.amount, 0);
 
-  // Cash: starts at openingCash, increases with deposits (customer pays cash), decreases with withdrawals (agent pays cash out)
-  const expectedCash = session.openingCash + totalDeposits - totalWithdrawals;
-  // Float (e-money): starts at openingFloat, decreases with deposits (agent sends e-money), increases with withdrawals (agent receives e-money)
-  const expectedFloat = session.openingFloat - totalDeposits + totalWithdrawals;
+  // Cash: openingCash + deposits (customer pays in) - withdrawals (agent pays out) + cash top-ups
+  const expectedCash = session.openingCash + totalDeposits - totalWithdrawals + totalCashReplenishments;
+  // Float: openingFloat - deposits (agent sends out) + withdrawals (agent receives) + float top-ups
+  const expectedFloat = session.openingFloat - totalDeposits + totalWithdrawals + totalFloatReplenishments;
 
   return {
     session,
@@ -284,6 +348,8 @@ export const computeDailySummary = (sessionId: string): DailySummary => {
     depositCount: deposits.length,
     withdrawalCount: withdrawals.length,
     totalCommission,
+    totalCashReplenishments,
+    totalFloatReplenishments,
     expectedCash,
     expectedFloat,
   };
@@ -306,6 +372,8 @@ export const saveReconciliation = (
     totalDeposits: summary.totalDeposits,
     totalWithdrawals: summary.totalWithdrawals,
     totalCommission: summary.totalCommission,
+    totalCashReplenishments: summary.totalCashReplenishments,
+    totalFloatReplenishments: summary.totalFloatReplenishments,
     expectedCash: summary.expectedCash,
     actualCash,
     expectedFloat: summary.expectedFloat,
@@ -318,10 +386,12 @@ export const saveReconciliation = (
   database.runSync(
     `INSERT INTO reconciliations
       (id, sessionId, agentId, date, totalDeposits, totalWithdrawals, totalCommission,
+       totalCashReplenishments, totalFloatReplenishments,
        expectedCash, actualCash, expectedFloat, actualFloat, cashVariance, floatVariance, createdAt)
-     VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+     VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
     [recon.id, recon.sessionId, recon.agentId, recon.date, recon.totalDeposits, recon.totalWithdrawals,
-     recon.totalCommission, recon.expectedCash, recon.actualCash, recon.expectedFloat, recon.actualFloat,
+     recon.totalCommission, recon.totalCashReplenishments, recon.totalFloatReplenishments,
+     recon.expectedCash, recon.actualCash, recon.expectedFloat, recon.actualFloat,
      recon.cashVariance, recon.floatVariance, recon.createdAt]
   );
 

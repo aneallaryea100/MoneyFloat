@@ -5,9 +5,11 @@ import {
 import { useFocusEffect } from '@react-navigation/native';
 import { Ionicons } from '@expo/vector-icons';
 import { useAuth } from '../../context/AuthContext';
-import { getReconciliationsByAgent, getSessionsByAgent } from '../../db/database';
+import { getReconciliationsByAgent, getSessionsByAgent, getBusinessById } from '../../db/database';
 import { COLORS, formatCurrency, formatDate } from '../../constants';
 import { Reconciliation } from '../../types';
+import { generatePeriodStatementHTML } from '../../utils/pdfTemplates';
+import { promptExportAction } from '../../utils/pdfExport';
 
 export const ReportsScreen = ({ navigation }: any) => {
   const { user } = useAuth();
@@ -31,6 +33,16 @@ export const ReportsScreen = ({ navigation }: any) => {
   const totalDays = filtered.length;
   const varianceDays = filtered.filter(r => Math.abs(r.cashVariance) + Math.abs(r.floatVariance) > 1).length;
 
+  const handleExportPDF = () => {
+    if (!user) return;
+    const business = getBusinessById(user.businessId);
+    if (!business) return;
+    const label = `Last ${period} Days`;
+    const html = generatePeriodStatementHTML(filtered, user, business, label);
+    const filename = `MoneyFloat_Statement_${period}days_${user.name.replace(/\s+/g, '_')}`;
+    promptExportAction(html, filename);
+  };
+
   return (
     <View style={styles.container}>
       <View style={styles.header}>
@@ -38,7 +50,10 @@ export const ReportsScreen = ({ navigation }: any) => {
           <Ionicons name="arrow-back" size={24} color={COLORS.textLight} />
         </TouchableOpacity>
         <Text style={styles.headerTitle}>My Reports</Text>
-        <View style={{ width: 24 }} />
+        <TouchableOpacity onPress={handleExportPDF} style={styles.exportBtn}>
+          <Ionicons name="document-text-outline" size={20} color={COLORS.primary} />
+          <Text style={styles.exportBtnText}>PDF</Text>
+        </TouchableOpacity>
       </View>
 
       <ScrollView contentContainerStyle={styles.content}>
@@ -140,6 +155,8 @@ const styles = StyleSheet.create({
     flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between',
   },
   headerTitle: { fontSize: 18, fontWeight: '700', color: COLORS.textLight },
+  exportBtn: { flexDirection: 'row', alignItems: 'center', gap: 4, backgroundColor: COLORS.primary + '22', borderRadius: 8, paddingHorizontal: 10, paddingVertical: 6 },
+  exportBtnText: { color: COLORS.primary, fontWeight: '700', fontSize: 13 },
   content: { padding: 16, paddingBottom: 40 },
   periodToggle: {
     flexDirection: 'row', backgroundColor: COLORS.surface,

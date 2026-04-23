@@ -42,7 +42,7 @@ export const OpenSessionModal = ({ visible, onClose, onOpen }: Props) => {
           <View style={styles.inputGroup}>
             <Text style={styles.label}>Opening Float (e-Money Balance)</Text>
             <View style={styles.inputWrap}>
-              <Text style={styles.currency}>GHS</Text>
+              <Text style={styles.currency}>₵</Text>
               <TextInput
                 style={styles.input}
                 placeholder="0.00"
@@ -58,7 +58,7 @@ export const OpenSessionModal = ({ visible, onClose, onOpen }: Props) => {
           <View style={styles.inputGroup}>
             <Text style={styles.label}>Opening Cash</Text>
             <View style={styles.inputWrap}>
-              <Text style={styles.currency}>GHS</Text>
+              <Text style={styles.currency}>₵</Text>
               <TextInput
                 style={styles.input}
                 placeholder="0.00"
