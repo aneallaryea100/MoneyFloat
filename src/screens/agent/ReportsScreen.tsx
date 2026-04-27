@@ -5,7 +5,7 @@ import {
 import { useFocusEffect } from '@react-navigation/native';
 import { Ionicons } from '@expo/vector-icons';
 import { useAuth } from '../../context/AuthContext';
-import { getReconciliationsByAgent, getSessionsByAgent, getBusinessById } from '../../db/database';
+import { getReconciliationsByAgent, getBusinessById } from '../../db/database';
 import { COLORS, formatCurrency, formatDate } from '../../constants';
 import { Reconciliation } from '../../types';
 import { generatePeriodStatementHTML } from '../../utils/pdfTemplates';
@@ -29,7 +29,6 @@ export const ReportsScreen = ({ navigation }: any) => {
 
   const totalDeposits = filtered.reduce((s, r) => s + r.totalDeposits, 0);
   const totalWithdrawals = filtered.reduce((s, r) => s + r.totalWithdrawals, 0);
-  const totalCommission = filtered.reduce((s, r) => s + r.totalCommission, 0);
   const totalDays = filtered.length;
   const varianceDays = filtered.filter(r => Math.abs(r.cashVariance) + Math.abs(r.floatVariance) > 1).length;
 
@@ -76,10 +75,6 @@ export const ReportsScreen = ({ navigation }: any) => {
           <View style={styles.summaryCard}>
             <Text style={styles.summaryLabel}>Total Withdrawals</Text>
             <Text style={[styles.summaryValue, { color: COLORS.danger }]}>{formatCurrency(totalWithdrawals)}</Text>
-          </View>
-          <View style={styles.summaryCard}>
-            <Text style={styles.summaryLabel}>Commission Earned</Text>
-            <Text style={[styles.summaryValue, { color: COLORS.primary }]}>{formatCurrency(totalCommission)}</Text>
           </View>
           <View style={styles.summaryCard}>
             <Text style={styles.summaryLabel}>Days Worked</Text>
@@ -135,8 +130,10 @@ export const ReportsScreen = ({ navigation }: any) => {
                     <Text style={[styles.dayStatValue, { color: COLORS.danger }]}>{formatCurrency(r.totalWithdrawals)}</Text>
                   </View>
                   <View style={styles.dayStat}>
-                    <Text style={styles.dayStatLabel}>Commission</Text>
-                    <Text style={[styles.dayStatValue, { color: COLORS.primary }]}>{formatCurrency(r.totalCommission)}</Text>
+                    <Text style={styles.dayStatLabel}>Cash Var.</Text>
+                    <Text style={[styles.dayStatValue, { color: Math.abs(r.cashVariance) < 1 ? COLORS.success : COLORS.warning }]}>
+                      {r.cashVariance >= 0 ? '+' : ''}{formatCurrency(r.cashVariance)}
+                    </Text>
                   </View>
                 </View>
               </View>

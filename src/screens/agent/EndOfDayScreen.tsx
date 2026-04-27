@@ -126,7 +126,6 @@ export const EndOfDayScreen = ({ navigation }: any) => {
             {summary.totalFloatReplenishments > 0 && (
               <ResultRow label="Float Top Ups" value={`+${formatCurrency(summary.totalFloatReplenishments)}`} valueColor={COLORS.info} />
             )}
-            <ResultRow label="Commission Earned" value={formatCurrency(summary.totalCommission)} valueColor={COLORS.primary} />
           </View>
 
           <View style={styles.resultCard}>
@@ -210,9 +209,9 @@ export const EndOfDayScreen = ({ navigation }: any) => {
             </View>
             <View style={styles.summaryDivider} />
             <View style={styles.summaryItem}>
-              <Text style={styles.summaryItemLabel}>Commission</Text>
-              <Text style={[styles.summaryItemValue, { color: COLORS.primary }]}>{formatCurrency(summary.totalCommission)}</Text>
-              <Text style={styles.summaryItemSub}>{txns.length} total</Text>
+              <Text style={styles.summaryItemLabel}>Transactions</Text>
+              <Text style={[styles.summaryItemValue, { color: COLORS.info }]}>{txns.length}</Text>
+              <Text style={styles.summaryItemSub}>total</Text>
             </View>
           </View>
 

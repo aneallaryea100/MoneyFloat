@@ -1,14 +1,13 @@
 import React, { useState, useCallback } from 'react';
 import {
   View, Text, ScrollView, TouchableOpacity, StyleSheet,
-  Alert, RefreshControl, FlatList
+  Alert, RefreshControl
 } from 'react-native';
 import { useFocusEffect } from '@react-navigation/native';
 import { Ionicons } from '@expo/vector-icons';
 import { useAuth } from '../../context/AuthContext';
 import {
   getAgentsByBusiness, getBusinessById,
-  getAllSessionsByBusiness, getReconciliationsByBusiness,
   getTodaySession, computeDailySummary
 } from '../../db/database';
 import { COLORS, formatCurrency, formatDate, TODAY } from '../../constants';
@@ -49,7 +48,6 @@ export const AdminDashboard = ({ navigation }: any) => {
 
   const totalDeposits = agentSummaries.reduce((s, a) => s + (a.summary?.totalDeposits ?? 0), 0);
   const totalWithdrawals = agentSummaries.reduce((s, a) => s + (a.summary?.totalWithdrawals ?? 0), 0);
-  const totalCommission = agentSummaries.reduce((s, a) => s + (a.summary?.totalCommission ?? 0), 0);
   const activeAgents = agentSummaries.filter(a => a.hasSession).length;
 
   return (
@@ -75,11 +73,11 @@ export const AdminDashboard = ({ navigation }: any) => {
         {/* Business Stats */}
         <View style={styles.statsRow}>
           <StatCard label="Active Agents" value={`${activeAgents}/${agentSummaries.length}`} color={COLORS.success} />
-          <StatCard label="Commission Today" value={formatCurrency(totalCommission)} color={COLORS.primary} />
+          <StatCard label="Total Withdrawals" value={formatCurrency(totalWithdrawals)} color={COLORS.danger} />
         </View>
         <View style={styles.statsRow}>
-          <StatCard label="Total Deposits" value={formatCurrency(totalDeposits)} color={COLORS.success} />
-          <StatCard label="Total Withdrawals" value={formatCurrency(totalWithdrawals)} color={COLORS.danger} />
+          <StatCard label="Total Deposits" value={formatCurrency(totalDeposits)} color={COLORS.info} />
+          <StatCard label="Net Flow" value={formatCurrency(totalDeposits - totalWithdrawals)} color={COLORS.primary} />
         </View>
 
         {/* Quick Actions */}
@@ -133,8 +131,8 @@ export const AdminDashboard = ({ navigation }: any) => {
                     <Text style={[styles.agentStatValue, { color: COLORS.danger }]}>{formatCurrency(summary.totalWithdrawals)}</Text>
                   </View>
                   <View style={styles.agentStat}>
-                    <Text style={styles.agentStatLabel}>Commission</Text>
-                    <Text style={[styles.agentStatValue, { color: COLORS.primary }]}>{formatCurrency(summary.totalCommission)}</Text>
+                    <Text style={styles.agentStatLabel}>Txns</Text>
+                    <Text style={[styles.agentStatValue, { color: COLORS.primary }]}>{summary.depositCount + summary.withdrawalCount}</Text>
                   </View>
                 </View>
               ) : (

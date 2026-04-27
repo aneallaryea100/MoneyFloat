@@ -149,14 +149,6 @@ export const AgentDashboard = ({ navigation }: any) => {
               />
             </View>
 
-            <View style={styles.commissionCard}>
-              <Ionicons name="trending-up" size={22} color={COLORS.primary} />
-              <View style={styles.commissionText}>
-                <Text style={styles.commissionLabel}>Commission Earned Today</Text>
-                <Text style={styles.commissionValue}>{formatCurrency(summary?.totalCommission ?? 0)}</Text>
-              </View>
-            </View>
-
             {/* Action Buttons — 2x2 grid */}
             <View style={styles.actionFlex}>
               <TouchableOpacity
@@ -257,14 +249,6 @@ const styles = StyleSheet.create({
   sessionDate: { color: COLORS.textLight, fontSize: 14, fontWeight: '600' },
   sessionTxnCount: { color: COLORS.primary, fontSize: 13, fontWeight: '600' },
   statsRow: { flexDirection: 'row', gap: 12, marginBottom: 12 },
-  commissionCard: {
-    backgroundColor: COLORS.secondary,
-    borderRadius: 12, padding: 16,
-    flexDirection: 'row', alignItems: 'center', gap: 12, marginBottom: 16,
-  },
-  commissionText: { flex: 1 },
-  commissionLabel: { color: COLORS.textLight, fontSize: 12, opacity: 0.7 },
-  commissionValue: { color: COLORS.primary, fontSize: 20, fontWeight: '800', marginTop: 2 },
   actionGrid: {
     flexDirection: 'row', flexWrap: 'wrap', gap: 10, marginBottom: 24,
   },

@@ -7,7 +7,6 @@ import { Ionicons } from '@expo/vector-icons';
 import { useAuth } from '../../context/AuthContext';
 import { useSession } from '../../context/SessionContext';
 import { recordTransaction } from '../../db/database';
-import { calculateCommission } from '../../utils/commission';
 import { COLORS, NETWORKS, formatCurrency } from '../../constants';
 import { MomoNetwork, TransactionType } from '../../types';
 
@@ -22,7 +21,6 @@ export const RecordTransactionScreen = ({ navigation, route }: any) => {
 
   const isDeposit = type === 'deposit';
   const parsedAmount = parseFloat(amount) || 0;
-  const estimatedComm = parsedAmount > 0 ? calculateCommission(parsedAmount, network) : 0;
 
   const handleSubmit = () => {
     if (!activeSession) {
@@ -40,7 +38,7 @@ export const RecordTransactionScreen = ({ navigation, route }: any) => {
 
     Alert.alert(
       'Confirm Transaction',
-      `${isDeposit ? 'Deposit' : 'Withdrawal'} of ${formatCurrency(parsedAmount)} for ${customerPhone}\nNetwork: ${network}\nCommission: ${formatCurrency(estimatedComm)}`,
+      `${isDeposit ? 'Deposit' : 'Withdrawal'} of ${formatCurrency(parsedAmount)} for ${customerPhone}\nNetwork: ${network}`,
       [
         { text: 'Cancel', style: 'cancel' },
         {
@@ -58,7 +56,7 @@ export const RecordTransactionScreen = ({ navigation, route }: any) => {
               );
               Alert.alert(
                 'Success',
-                `Transaction recorded!\nRef: ${tx.reference}\nCommission: ${formatCurrency(tx.commission)}`,
+                `Transaction recorded!\nRef: ${tx.reference}`,
                 [{ text: 'OK', onPress: () => { setAmount(''); setCustomerPhone(''); setNote(''); } }]
               );
             } catch (e: any) {
@@ -142,11 +140,6 @@ export const RecordTransactionScreen = ({ navigation, route }: any) => {
               placeholderTextColor={COLORS.textSecondary}
             />
           </View>
-          {estimatedComm > 0 && (
-            <Text style={styles.commHint}>
-              Estimated commission: {formatCurrency(estimatedComm)}
-            </Text>
-          )}
         </View>
 
         {/* Customer Phone */}
@@ -195,13 +188,9 @@ export const RecordTransactionScreen = ({ navigation, route }: any) => {
               <Text style={styles.previewLabel}>Amount</Text>
               <Text style={styles.previewValue}>{formatCurrency(parsedAmount)}</Text>
             </View>
-            <View style={styles.previewRow}>
+            <View style={[styles.previewRow, styles.previewLast]}>
               <Text style={styles.previewLabel}>Network</Text>
               <Text style={styles.previewValue}>{network}</Text>
-            </View>
-            <View style={[styles.previewRow, styles.previewLast]}>
-              <Text style={styles.previewLabel}>Commission</Text>
-              <Text style={[styles.previewValue, { color: COLORS.success }]}>{formatCurrency(estimatedComm)}</Text>
             </View>
           </View>
         )}
@@ -270,7 +259,6 @@ const styles = StyleSheet.create({
   },
   ghsLabel: { fontSize: 18, fontWeight: '700', color: COLORS.textSecondary, marginRight: 10 },
   amountInput: { flex: 1, height: 60, fontSize: 28, fontWeight: '700', color: COLORS.textPrimary },
-  commHint: { fontSize: 12, color: COLORS.success, marginTop: 6, fontWeight: '500' },
   inputWrap: {
     flexDirection: 'row', alignItems: 'center',
     borderWidth: 1.5, borderColor: COLORS.border, borderRadius: 12,

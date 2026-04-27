@@ -32,7 +32,6 @@ export const TransactionItem = ({ transaction: t }: Props) => {
         <Text style={[styles.amount, { color: isDeposit ? COLORS.success : COLORS.danger }]}>
           {isDeposit ? '+' : '-'}{formatCurrency(t.amount)}
         </Text>
-        <Text style={styles.commission}>+{formatCurrency(t.commission)} comm.</Text>
         <Text style={styles.time}>{formatTime(t.createdAt)}</Text>
       </View>
     </View>
@@ -90,11 +89,6 @@ const styles = StyleSheet.create({
   amount: {
     fontSize: 15,
     fontWeight: '700',
-  },
-  commission: {
-    fontSize: 10,
-    color: COLORS.success,
-    marginTop: 2,
   },
   time: {
     fontSize: 10,

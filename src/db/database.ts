@@ -2,7 +2,7 @@ import * as SQLite from 'expo-sqlite';
 import {
   User, Business, Transaction, DailySession, Reconciliation, DailySummary, Replenishment
 } from '../types';
-import { generateId, generateReference, calculateCommission } from '../utils/commission';
+import { generateId, generateReference } from '../utils/commission';
 import { TODAY } from '../constants';
 
 let db: SQLite.SQLiteDatabase;
@@ -165,6 +165,24 @@ export const getUserById = (id: string): User | null => {
   return database.getFirstSync<User>('SELECT * FROM users WHERE id = ?', [id]);
 };
 
+export const updateUser = (
+  userId: string,
+  updates: { name: string; phone: string; network: 'MTN' | 'Telecel' | 'AirtelTigo'; pin?: string }
+): void => {
+  const database = getDb();
+  if (updates.pin) {
+    database.runSync(
+      'UPDATE users SET name = ?, phone = ?, network = ?, pin = ? WHERE id = ?',
+      [updates.name, updates.phone, updates.network, updates.pin, userId]
+    );
+  } else {
+    database.runSync(
+      'UPDATE users SET name = ?, phone = ?, network = ? WHERE id = ?',
+      [updates.name, updates.phone, updates.network, userId]
+    );
+  }
+};
+
 export const getAgentsByBusiness = (businessId: string): User[] => {
   const database = getDb();
   return database.getAllSync<User>(
@@ -248,7 +266,6 @@ export const recordTransaction = (
   note?: string
 ): Transaction => {
   const database = getDb();
-  const commission = calculateCommission(amount, network);
   const tx: Transaction = {
     id: generateId(),
     agentId,
@@ -258,13 +275,12 @@ export const recordTransaction = (
     customerPhone,
     network,
     reference: generateReference(),
-    commission,
     note,
     createdAt: new Date().toISOString(),
   };
   database.runSync(
     'INSERT INTO transactions (id, agentId, sessionId, type, amount, customerPhone, network, reference, commission, note, createdAt) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)',
-    [tx.id, tx.agentId, tx.sessionId, tx.type, tx.amount, tx.customerPhone, tx.network, tx.reference, tx.commission, tx.note ?? null, tx.createdAt]
+    [tx.id, tx.agentId, tx.sessionId, tx.type, tx.amount, tx.customerPhone, tx.network, tx.reference, 0, tx.note ?? null, tx.createdAt]
   );
   return tx;
 };
@@ -332,7 +348,6 @@ export const computeDailySummary = (sessionId: string): DailySummary => {
 
   const totalDeposits = deposits.reduce((s, t) => s + t.amount, 0);
   const totalWithdrawals = withdrawals.reduce((s, t) => s + t.amount, 0);
-  const totalCommission = txns.reduce((s, t) => s + t.commission, 0);
   const totalCashReplenishments = replenishments.filter(r => r.type === 'cash').reduce((s, r) => s + r.amount, 0);
   const totalFloatReplenishments = replenishments.filter(r => r.type === 'float').reduce((s, r) => s + r.amount, 0);
 
@@ -347,7 +362,6 @@ export const computeDailySummary = (sessionId: string): DailySummary => {
     totalWithdrawals,
     depositCount: deposits.length,
     withdrawalCount: withdrawals.length,
-    totalCommission,
     totalCashReplenishments,
     totalFloatReplenishments,
     expectedCash,
@@ -371,7 +385,6 @@ export const saveReconciliation = (
     date: summary.session.date,
     totalDeposits: summary.totalDeposits,
     totalWithdrawals: summary.totalWithdrawals,
-    totalCommission: summary.totalCommission,
     totalCashReplenishments: summary.totalCashReplenishments,
     totalFloatReplenishments: summary.totalFloatReplenishments,
     expectedCash: summary.expectedCash,
@@ -390,7 +403,7 @@ export const saveReconciliation = (
        expectedCash, actualCash, expectedFloat, actualFloat, cashVariance, floatVariance, createdAt)
      VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
     [recon.id, recon.sessionId, recon.agentId, recon.date, recon.totalDeposits, recon.totalWithdrawals,
-     recon.totalCommission, recon.totalCashReplenishments, recon.totalFloatReplenishments,
+     0, recon.totalCashReplenishments, recon.totalFloatReplenishments,
      recon.expectedCash, recon.actualCash, recon.expectedFloat, recon.actualFloat,
      recon.cashVariance, recon.floatVariance, recon.createdAt]
   );

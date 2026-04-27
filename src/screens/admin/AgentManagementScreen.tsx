@@ -1,28 +1,56 @@
 import React, { useState, useCallback } from 'react';
 import {
   View, Text, FlatList, StyleSheet, TouchableOpacity,
-  Modal, TextInput, Alert, KeyboardAvoidingView, Platform
+  Modal, TextInput, Alert, KeyboardAvoidingView, Platform, ScrollView
 } from 'react-native';
 import { useFocusEffect } from '@react-navigation/native';
 import { Ionicons } from '@expo/vector-icons';
 import { useAuth } from '../../context/AuthContext';
-import { getAgentsByBusiness, createUser, getUserByPhone } from '../../db/database';
+import { getAgentsByBusiness, createUser, getUserByPhone, updateUser } from '../../db/database';
 import { COLORS, NETWORKS } from '../../constants';
 import { User, MomoNetwork } from '../../types';
 import { NetworkBadge } from '../../components/NetworkBadge';
 
+type ModalMode = 'add' | 'edit';
+
 export const AgentManagementScreen = ({ navigation }: any) => {
   const { user } = useAuth();
   const [agents, setAgents] = useState<User[]>([]);
+  const [modalMode, setModalMode] = useState<ModalMode>('add');
   const [showModal, setShowModal] = useState(false);
+  const [editingAgent, setEditingAgent] = useState<User | null>(null);
+
   const [name, setName] = useState('');
   const [phone, setPhone] = useState('');
   const [pin, setPin] = useState('');
+  const [newPin, setNewPin] = useState('');
   const [network, setNetwork] = useState<MomoNetwork>('MTN');
 
   useFocusEffect(useCallback(() => {
     if (user) setAgents(getAgentsByBusiness(user.businessId));
   }, [user]));
+
+  const resetForm = () => {
+    setName(''); setPhone(''); setPin(''); setNewPin(''); setNetwork('MTN');
+    setEditingAgent(null);
+  };
+
+  const openAddModal = () => {
+    resetForm();
+    setModalMode('add');
+    setShowModal(true);
+  };
+
+  const openEditModal = (agent: User) => {
+    setEditingAgent(agent);
+    setName(agent.name);
+    setPhone(agent.phone);
+    setNetwork(agent.network);
+    setPin('');
+    setNewPin('');
+    setModalMode('edit');
+    setShowModal(true);
+  };
 
   const handleAddAgent = () => {
     if (!name.trim() || !phone.trim() || !pin.trim()) {
@@ -46,8 +74,63 @@ export const AgentManagementScreen = ({ navigation }: any) => {
 
     setAgents(prev => [...prev, newAgent]);
     setShowModal(false);
-    setName(''); setPhone(''); setPin(''); setNetwork('MTN');
-    Alert.alert('Success', `${name} added as agent successfully!`);
+    resetForm();
+    Alert.alert('Success', `${name.trim()} added as agent successfully!`);
+  };
+
+  const handleEditAgent = () => {
+    if (!editingAgent) return;
+    if (!name.trim() || !phone.trim()) {
+      Alert.alert('Error', 'Name and phone are required');
+      return;
+    }
+    if (phone.trim().length < 10) { Alert.alert('Error', 'Enter valid phone number'); return; }
+
+    const existing = getUserByPhone(phone.trim());
+    if (existing && existing.id !== editingAgent.id) {
+      Alert.alert('Error', 'Phone number already used by another agent');
+      return;
+    }
+
+    if (newPin && newPin.length < 4) {
+      Alert.alert('Error', 'New PIN must be at least 4 digits');
+      return;
+    }
+
+    updateUser(editingAgent.id, {
+      name: name.trim(),
+      phone: phone.trim(),
+      network,
+      pin: newPin.trim() || undefined,
+    });
+
+    setAgents(prev => prev.map(a =>
+      a.id === editingAgent.id
+        ? { ...a, name: name.trim(), phone: phone.trim(), network }
+        : a
+    ));
+    setShowModal(false);
+    resetForm();
+    Alert.alert('Updated', `${name.trim()}'s details have been updated.`);
+  };
+
+  const handleDeleteAgent = (agent: User) => {
+    Alert.alert(
+      'Remove Agent',
+      `Are you sure you want to remove ${agent.name}? This will not delete their transaction history.`,
+      [
+        { text: 'Cancel', style: 'cancel' },
+        {
+          text: 'Remove',
+          style: 'destructive',
+          onPress: () => {
+            setAgents(prev => prev.filter(a => a.id !== agent.id));
+            setShowModal(false);
+            resetForm();
+          },
+        },
+      ]
+    );
   };
 
   return (
@@ -57,7 +140,7 @@ export const AgentManagementScreen = ({ navigation }: any) => {
           <Ionicons name="arrow-back" size={24} color={COLORS.textLight} />
         </TouchableOpacity>
         <Text style={styles.headerTitle}>Agents ({agents.length})</Text>
-        <TouchableOpacity onPress={() => setShowModal(true)}>
+        <TouchableOpacity onPress={openAddModal}>
           <Ionicons name="person-add" size={24} color={COLORS.primary} />
         </TouchableOpacity>
       </View>
@@ -70,7 +153,7 @@ export const AgentManagementScreen = ({ navigation }: any) => {
           <View style={styles.empty}>
             <Ionicons name="people-outline" size={48} color={COLORS.textSecondary} />
             <Text style={styles.emptyText}>No agents yet</Text>
-            <TouchableOpacity style={styles.addBtn} onPress={() => setShowModal(true)}>
+            <TouchableOpacity style={styles.addBtn} onPress={openAddModal}>
               <Text style={styles.addBtnText}>+ Add First Agent</Text>
             </TouchableOpacity>
           </View>
@@ -85,11 +168,9 @@ export const AgentManagementScreen = ({ navigation }: any) => {
               <Text style={styles.agentPhone}>{agent.phone}</Text>
               <NetworkBadge network={agent.network} size="sm" />
             </View>
-            <View style={styles.agentMeta}>
-              <View style={styles.roleBadge}>
-                <Text style={styles.roleText}>Agent</Text>
-              </View>
-            </View>
+            <TouchableOpacity style={styles.editBtn} onPress={() => openEditModal(agent)}>
+              <Ionicons name="create-outline" size={20} color={COLORS.primary} />
+            </TouchableOpacity>
           </View>
         )}
       />
@@ -99,51 +180,111 @@ export const AgentManagementScreen = ({ navigation }: any) => {
           <View style={styles.sheet}>
             <View style={styles.handle} />
             <View style={styles.sheetHeader}>
-              <Text style={styles.sheetTitle}>Add New Agent</Text>
-              <TouchableOpacity onPress={() => setShowModal(false)}>
+              <Text style={styles.sheetTitle}>
+                {modalMode === 'add' ? 'Add New Agent' : 'Edit Agent'}
+              </Text>
+              <TouchableOpacity onPress={() => { setShowModal(false); resetForm(); }}>
                 <Ionicons name="close" size={24} color={COLORS.textSecondary} />
               </TouchableOpacity>
             </View>
 
-            <View style={styles.inputGroup}>
-              <Text style={styles.label}>Full Name</Text>
-              <View style={styles.inputWrap}>
-                <TextInput style={styles.input} placeholder="Agent's full name" value={name} onChangeText={setName} placeholderTextColor={COLORS.textSecondary} />
+            <ScrollView showsVerticalScrollIndicator={false}>
+              <View style={styles.inputGroup}>
+                <Text style={styles.label}>Full Name</Text>
+                <View style={styles.inputWrap}>
+                  <TextInput
+                    style={styles.input}
+                    placeholder="Agent's full name"
+                    value={name}
+                    onChangeText={setName}
+                    placeholderTextColor={COLORS.textSecondary}
+                  />
+                </View>
               </View>
-            </View>
 
-            <View style={styles.inputGroup}>
-              <Text style={styles.label}>Phone Number</Text>
-              <View style={styles.inputWrap}>
-                <TextInput style={styles.input} placeholder="0XX XXX XXXX" value={phone} onChangeText={setPhone} keyboardType="phone-pad" maxLength={10} placeholderTextColor={COLORS.textSecondary} />
+              <View style={styles.inputGroup}>
+                <Text style={styles.label}>Phone Number</Text>
+                <View style={styles.inputWrap}>
+                  <TextInput
+                    style={styles.input}
+                    placeholder="0XX XXX XXXX"
+                    value={phone}
+                    onChangeText={setPhone}
+                    keyboardType="phone-pad"
+                    maxLength={10}
+                    placeholderTextColor={COLORS.textSecondary}
+                  />
+                </View>
               </View>
-            </View>
 
-            <View style={styles.inputGroup}>
-              <Text style={styles.label}>Initial PIN (Agent can change later)</Text>
-              <View style={styles.inputWrap}>
-                <TextInput style={styles.input} placeholder="4-6 digits" value={pin} onChangeText={setPin} keyboardType="numeric" maxLength={6} secureTextEntry placeholderTextColor={COLORS.textSecondary} />
+              <View style={styles.inputGroup}>
+                <Text style={styles.label}>Primary Network</Text>
+                <View style={styles.networkRow}>
+                  {NETWORKS.map(n => (
+                    <TouchableOpacity
+                      key={n}
+                      style={[styles.networkBtn, network === n && styles.networkBtnActive]}
+                      onPress={() => setNetwork(n)}
+                    >
+                      <Text style={[styles.networkBtnText, network === n && styles.networkBtnTextActive]}>{n}</Text>
+                    </TouchableOpacity>
+                  ))}
+                </View>
               </View>
-            </View>
 
-            <View style={styles.inputGroup}>
-              <Text style={styles.label}>Primary Network</Text>
-              <View style={styles.networkRow}>
-                {NETWORKS.map(n => (
-                  <TouchableOpacity
-                    key={n}
-                    style={[styles.networkBtn, network === n && styles.networkBtnActive]}
-                    onPress={() => setNetwork(n)}
-                  >
-                    <Text style={[styles.networkBtnText, network === n && styles.networkBtnTextActive]}>{n}</Text>
-                  </TouchableOpacity>
-                ))}
-              </View>
-            </View>
+              {modalMode === 'add' ? (
+                <View style={styles.inputGroup}>
+                  <Text style={styles.label}>PIN (4–6 digits)</Text>
+                  <View style={styles.inputWrap}>
+                    <TextInput
+                      style={styles.input}
+                      placeholder="Agent's login PIN"
+                      value={pin}
+                      onChangeText={setPin}
+                      keyboardType="numeric"
+                      maxLength={6}
+                      secureTextEntry
+                      placeholderTextColor={COLORS.textSecondary}
+                    />
+                  </View>
+                </View>
+              ) : (
+                <View style={styles.inputGroup}>
+                  <Text style={styles.label}>New PIN (leave blank to keep current)</Text>
+                  <View style={styles.inputWrap}>
+                    <TextInput
+                      style={styles.input}
+                      placeholder="Enter new PIN to reset"
+                      value={newPin}
+                      onChangeText={setNewPin}
+                      keyboardType="numeric"
+                      maxLength={6}
+                      secureTextEntry
+                      placeholderTextColor={COLORS.textSecondary}
+                    />
+                  </View>
+                </View>
+              )}
 
-            <TouchableOpacity style={styles.saveBtn} onPress={handleAddAgent}>
-              <Text style={styles.saveBtnText}>Add Agent</Text>
-            </TouchableOpacity>
+              <TouchableOpacity
+                style={styles.saveBtn}
+                onPress={modalMode === 'add' ? handleAddAgent : handleEditAgent}
+              >
+                <Text style={styles.saveBtnText}>
+                  {modalMode === 'add' ? 'Add Agent' : 'Save Changes'}
+                </Text>
+              </TouchableOpacity>
+
+              {modalMode === 'edit' && editingAgent && (
+                <TouchableOpacity
+                  style={styles.deleteBtn}
+                  onPress={() => handleDeleteAgent(editingAgent)}
+                >
+                  <Ionicons name="person-remove-outline" size={18} color={COLORS.danger} />
+                  <Text style={styles.deleteBtnText}>Remove Agent</Text>
+                </TouchableOpacity>
+              )}
+            </ScrollView>
           </View>
         </KeyboardAvoidingView>
       </Modal>
@@ -166,6 +307,7 @@ const styles = StyleSheet.create({
   agentCard: {
     backgroundColor: COLORS.surface, borderRadius: 14, padding: 14, marginBottom: 10,
     flexDirection: 'row', alignItems: 'center',
+    shadowColor: '#000', shadowOffset: { width: 0, height: 1 }, shadowOpacity: 0.05, shadowRadius: 2, elevation: 1,
   },
   avatar: {
     width: 48, height: 48, borderRadius: 24,
@@ -175,17 +317,15 @@ const styles = StyleSheet.create({
   agentInfo: { flex: 1, gap: 3 },
   agentName: { fontSize: 15, fontWeight: '700', color: COLORS.textPrimary },
   agentPhone: { fontSize: 13, color: COLORS.textSecondary },
-  agentMeta: { alignItems: 'flex-end' },
-  roleBadge: {
-    backgroundColor: COLORS.info + '22', borderRadius: 8,
-    paddingHorizontal: 8, paddingVertical: 4, borderWidth: 1, borderColor: COLORS.info,
+  editBtn: {
+    padding: 8, backgroundColor: COLORS.primary + '22',
+    borderRadius: 10, borderWidth: 1, borderColor: COLORS.primary + '44',
   },
-  roleText: { fontSize: 11, color: COLORS.info, fontWeight: '700' },
   overlay: { flex: 1, justifyContent: 'flex-end', backgroundColor: 'rgba(0,0,0,0.5)' },
   sheet: {
     backgroundColor: COLORS.surface,
     borderTopLeftRadius: 24, borderTopRightRadius: 24,
-    padding: 24, paddingBottom: 40,
+    padding: 24, paddingBottom: 40, maxHeight: '90%',
   },
   handle: { width: 40, height: 4, backgroundColor: COLORS.border, borderRadius: 2, alignSelf: 'center', marginBottom: 20 },
   sheetHeader: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginBottom: 20 },
@@ -210,4 +350,11 @@ const styles = StyleSheet.create({
     justifyContent: 'center', alignItems: 'center', marginTop: 8,
   },
   saveBtnText: { fontSize: 16, fontWeight: '700', color: COLORS.secondary },
+  deleteBtn: {
+    flexDirection: 'row', justifyContent: 'center', alignItems: 'center', gap: 6,
+    marginTop: 12, padding: 14, borderRadius: 12,
+    borderWidth: 1.5, borderColor: COLORS.danger + '55',
+    backgroundColor: COLORS.danger + '11',
+  },
+  deleteBtnText: { fontSize: 14, fontWeight: '700', color: COLORS.danger },
 });

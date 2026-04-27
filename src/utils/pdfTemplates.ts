@@ -268,10 +268,10 @@ export const generateDailyReconciliationHTML = (
         <div class="stat-value r">${fmt(recon.totalWithdrawals)}</div>
         <div class="stat-sub">Cash paid out to customers</div>
       </div>
-      <div class="stat-box o">
-        <div class="stat-label">Commission Earned</div>
-        <div class="stat-value o">${fmt(recon.totalCommission)}</div>
-        <div class="stat-sub">Today's revenue</div>
+      <div class="stat-box n">
+        <div class="stat-label">Net Flow</div>
+        <div class="stat-value">${fmt(recon.totalDeposits - recon.totalWithdrawals)}</div>
+        <div class="stat-sub">Deposits − Withdrawals</div>
       </div>
     </div>
 
@@ -415,7 +415,6 @@ export const generatePeriodStatementHTML = (
 ): string => {
   const totalDeposits     = reconciliations.reduce((s, r) => s + r.totalDeposits, 0);
   const totalWithdrawals  = reconciliations.reduce((s, r) => s + r.totalWithdrawals, 0);
-  const totalCommission   = reconciliations.reduce((s, r) => s + r.totalCommission, 0);
   const totalCashTopUps   = reconciliations.reduce((s, r) => s + r.totalCashReplenishments, 0);
   const totalFloatTopUps  = reconciliations.reduce((s, r) => s + r.totalFloatReplenishments, 0);
   const balancedCount     = reconciliations.filter(r => Math.abs(r.cashVariance) + Math.abs(r.floatVariance) < 0.01).length;
@@ -427,7 +426,6 @@ export const generatePeriodStatementHTML = (
       <td>${formatDate(r.date)}</td>
       <td class="text-g bold">${fmt(r.totalDeposits)}</td>
       <td class="text-r bold">${fmt(r.totalWithdrawals)}</td>
-      <td class="text-o bold">${fmt(r.totalCommission)}</td>
       <td>${r.totalCashReplenishments > 0 ? `<span class="text-g">+${fmt(r.totalCashReplenishments)}</span>` : '—'}</td>
       <td>${r.totalFloatReplenishments > 0 ? `<span class="text-b">+${fmt(r.totalFloatReplenishments)}</span>` : '—'}</td>
       <td style="color:${vColor(r.cashVariance)}">${vLabel(r.cashVariance)}</td>
@@ -446,13 +444,12 @@ export const generatePeriodStatementHTML = (
   <title>MoneyFloat Period Statement — ${periodLabel}</title>
   <style>${CSS}
     .period-table col.c-date { width: 90px; }
-    .period-table col.c-dep  { width: 90px; }
-    .period-table col.c-with { width: 90px; }
-    .period-table col.c-comm { width: 80px; }
-    .period-table col.c-cas  { width: 80px; }
-    .period-table col.c-flo  { width: 80px; }
-    .period-table col.c-cv   { width: 90px; }
-    .period-table col.c-fv   { width: 90px; }
+    .period-table col.c-dep  { width: 100px; }
+    .period-table col.c-with { width: 100px; }
+    .period-table col.c-cas  { width: 90px; }
+    .period-table col.c-flo  { width: 90px; }
+    .period-table col.c-cv   { width: 100px; }
+    .period-table col.c-fv   { width: 100px; }
     .period-table col.c-st   { width: 60px; }
   </style>
 </head>
@@ -490,9 +487,9 @@ export const generatePeriodStatementHTML = (
         <div class="stat-label">Total Withdrawals</div>
         <div class="stat-value r">${fmt(totalWithdrawals)}</div>
       </div>
-      <div class="stat-box o">
-        <div class="stat-label">Total Commission</div>
-        <div class="stat-value o">${fmt(totalCommission)}</div>
+      <div class="stat-box n">
+        <div class="stat-label">Net Flow</div>
+        <div class="stat-value">${fmt(totalDeposits - totalWithdrawals)}</div>
       </div>
     </div>
     <div class="stat-row">
@@ -521,11 +518,11 @@ export const generatePeriodStatementHTML = (
       : `<table class="period-table">
           <colgroup>
             <col class="c-date"><col class="c-dep"><col class="c-with">
-            <col class="c-comm"><col class="c-cas"><col class="c-flo">
+            <col class="c-cas"><col class="c-flo">
             <col class="c-cv"><col class="c-fv"><col class="c-st">
           </colgroup>
           <thead><tr>
-            <th>Date</th><th>Deposits</th><th>Withdrawals</th><th>Commission</th>
+            <th>Date</th><th>Deposits</th><th>Withdrawals</th>
             <th>Cash T/U</th><th>Float T/U</th>
             <th>Cash Var.</th><th>Float Var.</th><th>Status</th>
           </tr></thead>
@@ -534,7 +531,6 @@ export const generatePeriodStatementHTML = (
             <td>TOTAL</td>
             <td>${fmt(totalDeposits)}</td>
             <td>${fmt(totalWithdrawals)}</td>
-            <td>${fmt(totalCommission)}</td>
             <td>${totalCashTopUps > 0 ? fmt(totalCashTopUps) : '—'}</td>
             <td>${totalFloatTopUps > 0 ? fmt(totalFloatTopUps) : '—'}</td>
             <td colspan="2"></td>
@@ -569,7 +565,6 @@ export const generateBusinessStatementHTML = (
 ): string => {
   const totalDeposits    = reconciliations.reduce((s, r) => s + r.totalDeposits, 0);
   const totalWithdrawals = reconciliations.reduce((s, r) => s + r.totalWithdrawals, 0);
-  const totalCommission  = reconciliations.reduce((s, r) => s + r.totalCommission, 0);
   const balancedCount    = reconciliations.filter(r => Math.abs(r.cashVariance) + Math.abs(r.floatVariance) < 0.01).length;
 
   const rows = reconciliations.map((r, i) => {
@@ -582,7 +577,6 @@ export const generateBusinessStatementHTML = (
       <td>${agent?.network ?? '—'}</td>
       <td class="text-g bold">${fmt(r.totalDeposits)}</td>
       <td class="text-r bold">${fmt(r.totalWithdrawals)}</td>
-      <td class="text-o bold">${fmt(r.totalCommission)}</td>
       <td style="color:${vColor(r.cashVariance)}">${vLabel(r.cashVariance)}</td>
       <td style="color:${vColor(r.floatVariance)}">${vLabel(r.floatVariance)}</td>
       <td><span class="badge ${balanced ? 'badge-ok' : 'badge-var'}">${balanced ? '✓ OK' : '⚠ Var'}</span></td>
@@ -596,13 +590,12 @@ export const generateBusinessStatementHTML = (
   <title>MoneyFloat Business Statement</title>
   <style>${CSS}
     .biz-table col.c-date { width: 80px; }
-    .biz-table col.c-agent{ width: 100px; }
-    .biz-table col.c-net  { width: 65px; }
-    .biz-table col.c-dep  { width: 85px; }
-    .biz-table col.c-with { width: 85px; }
-    .biz-table col.c-comm { width: 75px; }
-    .biz-table col.c-cv   { width: 85px; }
-    .biz-table col.c-fv   { width: 85px; }
+    .biz-table col.c-agent{ width: 110px; }
+    .biz-table col.c-net  { width: 70px; }
+    .biz-table col.c-dep  { width: 95px; }
+    .biz-table col.c-with { width: 95px; }
+    .biz-table col.c-cv   { width: 95px; }
+    .biz-table col.c-fv   { width: 95px; }
     .biz-table col.c-st   { width: 50px; }
   </style>
 </head>
@@ -641,10 +634,10 @@ export const generateBusinessStatementHTML = (
         <div class="stat-value r">${fmt(totalWithdrawals)}</div>
         <div class="stat-sub">All agents combined</div>
       </div>
-      <div class="stat-box o">
-        <div class="stat-label">Total Commission</div>
-        <div class="stat-value o">${fmt(totalCommission)}</div>
-        <div class="stat-sub">Total revenue earned</div>
+      <div class="stat-box n">
+        <div class="stat-label">Net Flow</div>
+        <div class="stat-value">${fmt(totalDeposits - totalWithdrawals)}</div>
+        <div class="stat-sub">Deposits − Withdrawals</div>
       </div>
     </div>
   </div>
@@ -656,12 +649,12 @@ export const generateBusinessStatementHTML = (
       : `<table class="biz-table">
           <colgroup>
             <col class="c-date"><col class="c-agent"><col class="c-net">
-            <col class="c-dep"><col class="c-with"><col class="c-comm">
+            <col class="c-dep"><col class="c-with">
             <col class="c-cv"><col class="c-fv"><col class="c-st">
           </colgroup>
           <thead><tr>
             <th>Date</th><th>Agent</th><th>Network</th>
-            <th>Deposits</th><th>Withdrawals</th><th>Commission</th>
+            <th>Deposits</th><th>Withdrawals</th>
             <th>Cash Var.</th><th>Float Var.</th><th>Status</th>
           </tr></thead>
           <tbody>${rows}</tbody>
@@ -669,7 +662,6 @@ export const generateBusinessStatementHTML = (
             <td colspan="3">TOTAL</td>
             <td>${fmt(totalDeposits)}</td>
             <td>${fmt(totalWithdrawals)}</td>
-            <td>${fmt(totalCommission)}</td>
             <td colspan="2"></td>
             <td>${balancedCount}/${reconciliations.length}</td>
           </tr></tfoot>

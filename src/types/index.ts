@@ -45,7 +45,6 @@ export interface Transaction {
   customerPhone: string;
   network: MomoNetwork;
   reference: string;
-  commission: number;
   note?: string;
   createdAt: string;
 }
@@ -70,7 +69,6 @@ export interface Reconciliation {
   date: string;
   totalDeposits: number;
   totalWithdrawals: number;
-  totalCommission: number;
   totalCashReplenishments: number;
   totalFloatReplenishments: number;
   expectedCash: number;
@@ -88,7 +86,6 @@ export interface DailySummary {
   totalWithdrawals: number;
   depositCount: number;
   withdrawalCount: number;
-  totalCommission: number;
   totalCashReplenishments: number;
   totalFloatReplenishments: number;
   expectedCash: number;

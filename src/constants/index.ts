@@ -26,28 +26,6 @@ export const NETWORK_COLORS: Record<MomoNetwork, string> = {
   AirtelTigo: '#FF6600',
 };
 
-// Ghana MoMo commission tiers (GHS) - approximate vendor rates
-export const COMMISSION_RATES: Record<MomoNetwork, { min: number; max: number; rate: number }[]> = {
-  MTN: [
-    { min: 1, max: 50, rate: 0.01 },
-    { min: 51, max: 300, rate: 0.009 },
-    { min: 301, max: 1000, rate: 0.008 },
-    { min: 1001, max: 5000, rate: 0.007 },
-    { min: 5001, max: 99999, rate: 0.006 },
-  ],
-  Telecel: [
-    { min: 1, max: 50, rate: 0.01 },
-    { min: 51, max: 300, rate: 0.009 },
-    { min: 301, max: 1000, rate: 0.008 },
-    { min: 1001, max: 99999, rate: 0.007 },
-  ],
-  AirtelTigo: [
-    { min: 1, max: 50, rate: 0.01 },
-    { min: 51, max: 300, rate: 0.009 },
-    { min: 301, max: 99999, rate: 0.008 },
-  ],
-};
-
 export const NETWORKS: MomoNetwork[] = ['MTN', 'Telecel', 'AirtelTigo'];
 
 export const formatCurrency = (amount: number): string => {

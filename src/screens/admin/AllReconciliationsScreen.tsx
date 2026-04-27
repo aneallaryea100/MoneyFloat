@@ -95,8 +95,10 @@ export const AllReconciliationsScreen = ({ navigation }: any) => {
                   <Text style={[styles.statValue, { color: COLORS.danger }]}>{formatCurrency(r.totalWithdrawals)}</Text>
                 </View>
                 <View style={styles.cardStat}>
-                  <Text style={styles.statLabel}>Commission</Text>
-                  <Text style={[styles.statValue, { color: COLORS.primary }]}>{formatCurrency(r.totalCommission)}</Text>
+                  <Text style={styles.statLabel}>Cash Var.</Text>
+                  <Text style={[styles.statValue, { color: Math.abs(r.cashVariance) < 1 ? COLORS.success : COLORS.warning }]}>
+                    {r.cashVariance >= 0 ? '+' : ''}{formatCurrency(r.cashVariance)}
+                  </Text>
                 </View>
               </View>
               {!balanced && (
